@@ -460,6 +460,9 @@ function Timer() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [running]);
 
+  const soundRef = useRef(sound);
+  useEffect(()=>{ soundRef.current = sound; },[sound]);
+
   useEffect(()=>{
     if(running){
       ref.current = setInterval(()=>{
@@ -470,15 +473,14 @@ function Timer() {
           setDone(true);
           setRem(0);
           releaseWakeLock();
+          if(soundRef.current) playBowl(0.7);
         } else {
           setRem(left);
         }
-      }, 500); // 500ms — илүү нарийн
+      }, 500);
     }
     return ()=>clearInterval(ref.current);
   },[running]);
-
-  useEffect(()=>{ if(done && sound) playBowl(); },[done]);
 
   const start=()=>{
     const seconds = dur * 60;
