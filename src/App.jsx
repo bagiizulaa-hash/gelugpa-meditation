@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";//
+import { useState, useEffect, useRef } from "react";
 
 const C = {
   bg: "#0a0a0f", surface: "#12121a", card: "#1a1a26", border: "#2a2a40",
