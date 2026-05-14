@@ -426,18 +426,83 @@ function Timer() {
   const [done, setDone] = useState(false);
   const [sound, setSound] = useState(true);
   const ref = useRef(null);
+  const endTimeRef = useRef(null); // дэлгэц харлах үед ашиглана
+  const wakeLockRef = useRef(null);
+
+  // Wake Lock — дэлгэцийг унтраахгүй байлгах
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      }
+    } catch(e) {}
+  };
+  const releaseWakeLock = () => {
+    try { wakeLockRef.current?.release(); wakeLockRef.current = null; } catch(e) {}
+  };
+
+  // Visibility API — дэлгэц эргэж нээгдэхэд цагийг засна
+  useEffect(()=>{
+    const onVisible = () => {
+      if (!running || !endTimeRef.current) return;
+      const left = Math.round((endTimeRef.current - Date.now()) / 1000);
+      if (left <= 0) {
+        clearInterval(ref.current);
+        setRunning(false);
+        setDone(true);
+        setRem(0);
+        releaseWakeLock();
+      } else {
+        setRem(left);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [running]);
+
   useEffect(()=>{
     if(running){
       ref.current = setInterval(()=>{
-        setRem(r=>{ if(r<=1){ clearInterval(ref.current); setRunning(false); setDone(true); return 0; } return r-1; });
-      },1000);
+        const left = Math.round((endTimeRef.current - Date.now()) / 1000);
+        if(left <= 0){
+          clearInterval(ref.current);
+          setRunning(false);
+          setDone(true);
+          setRem(0);
+          releaseWakeLock();
+        } else {
+          setRem(left);
+        }
+      }, 500); // 500ms — илүү нарийн
     }
     return ()=>clearInterval(ref.current);
   },[running]);
+
   useEffect(()=>{ if(done && sound) playBowl(); },[done]);
-  const start=()=>{ if(sound) playBowl(0.3); setRem(dur*60); setDone(false); setRunning(true); };
-  const stop=()=>{ clearInterval(ref.current); setRunning(false); if(sound) playBowl(0.4); };
-  const reset=()=>{ clearInterval(ref.current); setRunning(false); setDone(false); setRem(dur*60); };
+
+  const start=()=>{
+    const seconds = dur * 60;
+    endTimeRef.current = Date.now() + seconds * 1000;
+    if(sound) playBowl(0.3);
+    setRem(seconds);
+    setDone(false);
+    setRunning(true);
+    requestWakeLock();
+  };
+  const stop=()=>{
+    clearInterval(ref.current);
+    setRunning(false);
+    releaseWakeLock();
+    if(sound) playBowl(0.4);
+  };
+  const reset=()=>{
+    clearInterval(ref.current);
+    setRunning(false);
+    setDone(false);
+    setRem(dur*60);
+    endTimeRef.current = null;
+    releaseWakeLock();
+  };
   const mins=Math.floor(rem/60), secs=rem%60;
   const total=dur*60, prog=(running||done)?(total-rem)/total:0;
   const circ=2*Math.PI*108;
